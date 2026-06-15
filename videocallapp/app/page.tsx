@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { generateRoomCode, copyToClipboard } from '@/lib/utils';
+import { copyToClipboard } from '@/lib/utils';
 
 export default function Home() {
   const router = useRouter();
