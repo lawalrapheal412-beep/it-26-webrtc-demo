@@ -1,0 +1,15 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../videocallapp/node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Meeting {
+  id        String   @id @default(uuid())
+  roomCode  String   @unique
+  createdAt DateTime @default(now())
+}
