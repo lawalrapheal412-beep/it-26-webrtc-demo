@@ -8,7 +8,7 @@ export interface SignalMessage {
     type: 'offer' | 'answer' | 'ice-candidate';
     from: string;
     to?: string;
-    payload?: any;
+    payload?: unknown;
 }
 
 export interface Peer {
@@ -19,5 +19,6 @@ export interface Peer {
 
 export interface SocketMessage {
     type: 'user-joined' | 'user-left' | 'signal' | 'peer-list' | 'error';
-    payload?: any;
+    payload?: unknown;
 }
+console.log("WebRTC setup started");
