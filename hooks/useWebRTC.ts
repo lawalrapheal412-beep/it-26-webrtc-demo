@@ -55,7 +55,10 @@ export function useWebRTC(roomId: string) {
       });
       setLocalStream(stream);
 
-      const socket = io();
+      const socket = io('http://localhost:3001');
+      socket.on('connect', () => {
+        console.log('Connected to signaling server:', socket.id);
+      });
       socketRef.current = socket;
 
       pc = createPeerConnection();
@@ -63,6 +66,7 @@ export function useWebRTC(roomId: string) {
 
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
+      console.log('Joining room:', roomId);
       socket.emit('join-room', roomId);
 
       socket.on('user-joined', async () => {
@@ -72,6 +76,7 @@ export function useWebRTC(roomId: string) {
       });
 
       socket.on('offer', async ({ offer }) => {
+        console.log('Offer recieved');
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
@@ -79,10 +84,12 @@ export function useWebRTC(roomId: string) {
       });
 
       socket.on('answer', async ({ answer }) => {
+        console.log('Answer received');
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
       });
 
       socket.on('ice-candidate', async ({ candidate }) => {
+        console.log('ICE candidate received');
         try {
           await pc.addIceCandidate(new RTCIceCandidate(candidate));
         } catch (err) {

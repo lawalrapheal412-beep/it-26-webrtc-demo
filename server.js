@@ -1,127 +1,64 @@
 const express = require('express');
 const http = require('http');
-const socketIo = require('socket.io');
+const { Server } = require('socket.io');
 const cors = require('cors');
 
 const app = express();
-const server = http.createServer(app);
-const io = socketIo(server, {
-    cors: {
-        origin: '*',
-        methods: ['GET', 'POST'],
-    },
-});
 
 app.use(cors());
-app.use(express.json());
 
-// Store active rooms
-const rooms = new Map();
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+  },
+});
 
 io.on('connection', (socket) => {
-    console.log(`Client connected: ${socket.id}`);
+  console.log(`Client connected: ${socket.id}`);
 
-    // Handle join room
-    socket.on('join-room', (data) => {
-        const { roomCode, userId, userName } = data;
+  socket.on('join-room', (roomId) => {
+    console.log(`User joined room: ${roomId}`);
+    socket.join(roomId);
 
-        socket.join(roomCode);
-        console.log(`User ${userId} joined room ${roomCode}`);
+    const room = io.sockets.adapter.rooms.get(roomId);
 
-        // Initialize room if it doesn't exist
-        if (!rooms.has(roomCode)) {
-            rooms.set(roomCode, new Map());
-        }
+    if (room && room.size > 1) {
+      socket.to(roomId).emit('user-joined');
+    }
 
-        const room = rooms.get(roomCode);
-        room.set(userId, {
-            socketId: socket.id,
-            userName,
-            id: userId,
-        });
+    console.log(`${socket.id} joined room ${roomId}`);
+  });
 
-        // Send current peer list to the new user
-        const peers = Array.from(room.values()).map((user) => ({
-            id: user.id,
-            name: user.userName,
-        }));
+  socket.on('offer', ({ roomId, offer }) => {
+    console.log(`Offer sent in room ${roomId}`);
+    socket.to(roomId).emit('offer', { offer });
+  });
 
-        socket.emit('peer-list', { peers });
+  socket.on('answer', ({ roomId, answer }) => {
+    console.log(`Answer sent in room ${roomId}`);
+    socket.to(roomId).emit('answer', { answer });
+  });
 
-        // Notify others about the new peer
-        socket.to(roomCode).emit('peer-list', { peers });
+  socket.on('ice-candidate', ({ roomId, candidate }) => {
+    console.log(`ICE candidate relayed in room ${roomId}`);
+    socket.to(roomId).emit('ice-candidate', {
+      candidate,
     });
+  });
 
-    // Handle signal relay
-    socket.on('signal', (data) => {
-        const { to, from, payload } = data;
-
-        // Find the socket ID of the target peer
-        for (const room of rooms.values()) {
-            const targetUser = Array.from(room.values()).find((u) => u.id === to);
-            if (targetUser) {
-                io.to(targetUser.socketId).emit('signal', {
-                    from,
-                    payload,
-                });
-                break;
-            }
-        }
-    });
-
-    // Handle leave room
-    socket.on('leave-room', (data) => {
-        const { roomCode, userId } = data;
-
-        const room = rooms.get(roomCode);
-        if (room) {
-            room.delete(userId);
-            console.log(`User ${userId} left room ${roomCode}`);
-
-            // Send updated peer list
-            const peers = Array.from(room.values()).map((user) => ({
-                id: user.id,
-                name: user.userName,
-            }));
-
-            io.to(roomCode).emit('peer-list', { peers });
-
-            // Delete room if empty
-            if (room.size === 0) {
-                rooms.delete(roomCode);
-            }
-        }
-
-        socket.leave(roomCode);
-    });
-
-    // Handle disconnect
-    socket.on('disconnect', () => {
-        console.log(`Client disconnected: ${socket.id}`);
-
-        // Clean up user from all rooms
-        for (const [roomCode, room] of rooms.entries()) {
-            for (const [userId, user] of room.entries()) {
-                if (user.socketId === socket.id) {
-                    room.delete(userId);
-
-                    const peers = Array.from(room.values()).map((u) => ({
-                        id: u.id,
-                        name: u.userName,
-                    }));
-
-                    io.to(roomCode).emit('peer-list', { peers });
-
-                    if (room.size === 0) {
-                        rooms.delete(roomCode);
-                    }
-                }
-            }
-        }
-    });
+  socket.on('disconnect', () => {
+    console.log(`Client disconnected: ${socket.id}`);
+  });
+  app.get('/', (req, res) => {
+    res.send('WebRTC Signaling Server Running');
+  })
 });
 
 const PORT = process.env.PORT || 3001;
+
 server.listen(PORT, () => {
-    console.log(`Signaling server running on port ${PORT}`);
+  console.log(`Signaling server running on port ${PORT}`);
 });
